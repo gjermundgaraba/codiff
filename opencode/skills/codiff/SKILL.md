@@ -25,6 +25,11 @@ change. Codiff owns the format and authoring guidance, so this skill only handle
 - Use **plan mode** for `$codiff plan` or when the user explicitly asks to edit or approve a
   plan in Codiff before execution.
 - Use **desktop mode** for plain `$codiff`, `/codiff`, "open Codiff", or "show me Codiff".
+- In desktop mode, **attach by default** when your tool can run a command in the background and
+  notify you when it exits. Attached, the user can ask you about comments and send you their
+  feedback from Codiff. First read the review guide:
+  `node scripts/open-codiff.mjs --review guide`. Then open with `--attach`. Without that
+  capability, or when the user asks not to attach, open without `--attach`.
 - In share mode, only pass `--open` when the user explicitly asks to open the resulting share in
   a browser. Otherwise return the URL without opening it.
 
@@ -94,10 +99,10 @@ approval document.
 
 4. **Complete the selected handoff.**
 
-   Desktop mode:
+   Desktop mode, attached (leave out `--attach` when you cannot attach):
 
    ```bash
-   node scripts/open-codiff.mjs --file /tmp/codiff-walkthrough-<id>.json /path/to/repository
+   node scripts/open-codiff.mjs --attach --file /tmp/codiff-walkthrough-<id>.json /path/to/repository
    ```
 
    Share mode:
@@ -134,6 +139,8 @@ approval document.
    are pinned to a real section rather than dropped.
 
 Emit walkthrough JSON only into the temporary file. In desktop walkthrough mode, do not
-summarize the conversation back to the user. In walkthrough share mode, respond with the URL
+summarize the conversation back to the user. When attached, start
+`node scripts/open-codiff.mjs --review next` in the background right after opening Codiff, and
+handle each request as the review guide describes. In walkthrough share mode, respond with the URL
 printed by the command. In plan share mode, respond with the shared plan URL. In plan mode,
 continue from the edited Markdown after the blocking handoff returns.

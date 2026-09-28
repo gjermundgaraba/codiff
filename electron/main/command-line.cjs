@@ -114,6 +114,9 @@ const parseCommandLineArguments = (commandLine = process.argv) => {
       'apply-update': {
         type: 'boolean',
       },
+      attach: {
+        type: 'boolean',
+      },
       commit: {
         type: 'string',
       },
@@ -318,6 +321,9 @@ const parseCommandLineArguments = (commandLine = process.argv) => {
     launchOptions: {
       ...(values['apply-update'] === true ? { applyUpdate: true } : {}),
       ...(agentBackend ? { agentBackend } : {}),
+      ...(values.attach === true || (useEnvironment && process.env.CODIFF_ATTACH === '1')
+        ? { attach: true }
+        : {}),
       ...(claudeSessionId ? { claudeSessionId } : {}),
       ...(codexSessionId ? { codexSessionId } : {}),
       ...(opencodeSessionId ? { opencodeSessionId } : {}),

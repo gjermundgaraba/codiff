@@ -442,6 +442,8 @@ export type WalkthroughContext = {
 export type CodiffLaunchOptions = {
   agentBackend?: 'codex' | 'claude' | 'opencode' | 'pi';
   applyUpdate?: boolean;
+  /** Routes Ask and Send to agent to the agent that opened the window (`codiff review`). */
+  attach?: boolean;
   claudeSessionId?: string;
   codexSessionId?: string;
   opencodeSessionId?: string;
