@@ -171,6 +171,22 @@ const getFallbackSessionCwd = () => {
 
 const rawArgs = process.argv.slice(2);
 
+// `--review <command> ...` runs `codiff review <command> ...` for attached reviews.
+if (rawArgs[0] === '--review') {
+  const sessionCwd = getFallbackSessionCwd();
+  const codiffCommand = getCodiffCommand();
+  const result = spawnSync(
+    codiffCommand.command,
+    [...codiffCommand.args, 'review', ...rawArgs.slice(1)],
+    { cwd: sessionCwd, encoding: 'utf8', stdio: 'inherit' },
+  );
+  if (result.error) {
+    process.stderr.write(`${result.error.message}\n`);
+    process.exit(1);
+  }
+  process.exit(result.status ?? 0);
+}
+
 if (rawArgs[0] === '--resolve-plan-comments') {
   const reviewPath = rawArgs[1] ? resolve(rawArgs[1]) : '';
   const threadIds = rawArgs.slice(2).filter(Boolean);

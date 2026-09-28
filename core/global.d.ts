@@ -110,6 +110,7 @@ declare global {
         request: SaveMarkdownDocumentRequest,
       ) => Promise<SaveMarkdownDocumentResult>;
       savePlanReview: (review: PlanReview) => Promise<PlanReview>;
+      sendAttachedFeedback: (markdown: string) => Promise<void>;
       setDiffStyle: (value: CodiffPreferences['diffStyle']) => Promise<void>;
       setShowOutdated: (value: boolean) => Promise<void>;
       setWordWrap: (value: boolean) => Promise<void>;

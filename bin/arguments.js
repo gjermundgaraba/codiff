@@ -14,6 +14,11 @@ export const flagDefinitions = [
     type: 'string',
   },
   {
+    description: 'Keep the window attached to your agent; see `codiff review guide`.',
+    name: 'attach',
+    type: 'boolean',
+  },
+  {
     argument: '<ref>',
     // With the source given as a flag, the positional argument can only be the
     // repository path.
@@ -121,6 +126,7 @@ const usageExamples = [
   },
   { command: 'codiff mr 75', description: 'Review GitLab merge request !75.' },
   { command: 'codiff update', description: 'Update Codiff to the latest release.' },
+  { command: 'codiff review guide', description: 'Show how agents answer an attached review.' },
   { command: 'codiff --plan plan.md', description: 'Edit a plan and wait for handoff.' },
   { command: 'codiff --plan plan.md --share', description: 'Share a Markdown plan.' },
   { command: 'codiff -w', description: 'Walk through local changes, or HEAD when clean.' },
@@ -449,6 +455,7 @@ export const parseArguments = (args) => {
 
   return {
     ...(agentBackend ? { agentBackend } : {}),
+    ...(values.attach === true ? { attach: true } : {}),
     ...(claudeSessionId ? { claudeSessionId } : {}),
     ...(codexSessionId ? { codexSessionId } : {}),
     ...(opencodeSessionId ? { opencodeSessionId } : {}),

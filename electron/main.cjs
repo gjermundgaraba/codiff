@@ -113,6 +113,12 @@ const {
   readRepositoryWatcherSnapshot,
 } = require('./repository-watcher.cjs');
 const { getPlanReviewPath, readPlanReview, writePlanReview } = require('./plan-review.cjs');
+const {
+  askAttachedAgent,
+  getAttachedReviewDir,
+  resetAttachedReview,
+  sendAttachedFeedback,
+} = require('./attached-review.cjs');
 const { createSharedPlanSnapshot } = require('./shared-plan.cjs');
 const { createWalkthroughProgressReporter } = require('./walkthrough-progress.cjs');
 
@@ -237,6 +243,20 @@ const getMarkdownDocumentContext = (webContentsId) => ({
   planFile: windowLaunchOptions.get(webContentsId)?.planFile,
   repositoryRoot: getWindowRepositoryRoot(webContentsId),
 });
+
+/** @param {number} webContentsId */
+const getWindowAttachedReviewDir = (webContentsId) =>
+  windowLaunchOptions.get(webContentsId)?.attach
+    ? getAttachedReviewDir(getWindowRepositoryRoot(webContentsId))
+    : null;
+
+/** Opening an attached window starts a fresh inbox. @param {number} webContentsId */
+const startWindowAttachedReview = (webContentsId) => {
+  const attachedReviewDir = getWindowAttachedReviewDir(webContentsId);
+  if (attachedReviewDir) {
+    resetAttachedReview(attachedReviewDir);
+  }
+};
 
 /** @param {number} webContentsId @param {RepositoryState} state */
 const storeResolvedRepositoryState = (webContentsId, state) => {
@@ -925,6 +945,7 @@ const createWindow = (
   }
   windowRepositories.set(webContentsId, identity?.repositoryRoot || repositoryPath);
   windowLaunchOptions.set(webContentsId, launchOptions);
+  startWindowAttachedReview(webContentsId);
   const initialRepositoryStatePromise = launchOptions.planFile
     ? null
     : readInitialRepositoryStateWithConfig(repositoryPath, launchOptions);
@@ -1180,9 +1201,15 @@ const focusOrCreateWindow = (
         );
 
   if (matchingWindow) {
-    if (launchOptions.planFile || launchOptions.walkthrough || launchOptions.walkthroughFile) {
+    if (
+      launchOptions.attach ||
+      launchOptions.planFile ||
+      launchOptions.walkthrough ||
+      launchOptions.walkthroughFile
+    ) {
       windowRepositories.set(matchingWebContentsId, identity?.repositoryRoot || repositoryPath);
       windowLaunchOptions.set(matchingWebContentsId, launchOptions);
+      startWindowAttachedReview(matchingWebContentsId);
       if (launchOptions.planFile) {
         planInitialVersions.delete(matchingWebContentsId);
         readyPlanWindows.delete(matchingWebContentsId);
@@ -1540,6 +1567,14 @@ ipcMain.handle(
     },
 );
 
+ipcMain.handle('codiff:sendAttachedFeedback', (event, markdown) => {
+  const attachedReviewDir = getWindowAttachedReviewDir(event.sender.id);
+  if (!attachedReviewDir) {
+    throw new Error('This window is not attached to an agent.');
+  }
+  sendAttachedFeedback(attachedReviewDir, markdown);
+});
+
 ipcMain.handle('codiff:getAgentSkillStatus', (event) => {
   const installer = skillInstallerFor(resolveWindowAgent(event.sender.id).id);
   return installer ? installer.getStatus() : { installed: false, path: '' };
@@ -1751,6 +1786,12 @@ ipcMain.handle('codiff:getFeatureFlags', async (event) => {
 });
 
 ipcMain.handle('codiff:askReviewAssistant', async (event, request) => {
+  const attachedReviewDir = getWindowAttachedReviewDir(event.sender.id);
+  if (attachedReviewDir) {
+    return askAttachedAgent(attachedReviewDir, request, {
+      isCanceled: () => event.sender.isDestroyed(),
+    });
+  }
   const repositoryPath = windowRepositories.get(event.sender.id) || getLaunchPath();
   const launchOptions = windowLaunchOptions.get(event.sender.id);
   const state = await readRepositoryStateWithConfig(

@@ -25,6 +25,7 @@ import { PlanEditorView } from './app/components/PlanEditorView.tsx';
 import { ReviewCodeView, type ReviewDiffBlock } from './app/components/ReviewCodeView.tsx';
 import type { ReviewModeItem } from './app/components/ReviewModeControl.tsx';
 import { ReviewTopBar } from './app/components/ReviewTopBar.tsx';
+import { SendToAgentButton } from './app/components/SendToAgentButton.tsx';
 import { Sidebar } from './app/components/Sidebar.tsx';
 import { CommitView } from './app/components/walkthrough/CommitView.tsx';
 import {
@@ -1821,12 +1822,22 @@ export default function App() {
       <div aria-hidden className="window-drag-region" />
       <ReviewTopBar
         actions={
-          <CopyCommentsButton
-            comments={isSwitchingSource ? emptyReviewComments : reviewComments}
-            files={orderedFiles}
-            reviewCommentsPrefix={preferences.reviewCommentsPrefix}
-            showWhitespace={showWhitespace}
-          />
+          <>
+            {launchOptions.attach ? (
+              <SendToAgentButton
+                comments={isSwitchingSource ? emptyReviewComments : reviewComments}
+                files={orderedFiles}
+                reviewCommentsPrefix={preferences.reviewCommentsPrefix}
+                showWhitespace={showWhitespace}
+              />
+            ) : null}
+            <CopyCommentsButton
+              comments={isSwitchingSource ? emptyReviewComments : reviewComments}
+              files={orderedFiles}
+              reviewCommentsPrefix={preferences.reviewCommentsPrefix}
+              showWhitespace={showWhitespace}
+            />
+          </>
         }
         context={
           <>

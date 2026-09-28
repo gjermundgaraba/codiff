@@ -17,6 +17,7 @@ import {
 } from './arguments.js';
 import { completionShells, generateCompletionScript } from './completions.js';
 import { waitForPlanResult } from './plan-result.js';
+import { runReviewCommand } from './review-cli.js';
 import { runUpdateCommand } from './update-command.js';
 import { getUpdateNotice } from './update-notice.js';
 
@@ -126,6 +127,10 @@ const runCodiffUpdate = () => {
 
 const run = async () => {
   const rawArguments = process.argv.slice(2);
+  if (rawArguments[0] === 'review') {
+    process.exitCode = await runReviewCommand(rawArguments.slice(1));
+    return;
+  }
   if (rawArguments.length === 1 && rawArguments[0] === 'update') {
     process.exitCode = await runCodiffUpdate();
     return;
@@ -174,6 +179,7 @@ const run = async () => {
 
   const {
     agentBackend,
+    attach,
     branchRef,
     claudeSessionId,
     codexSessionId,
@@ -300,6 +306,7 @@ const run = async () => {
   const childEnv = {
     ...process.env,
     CODIFF_AGENT_BACKEND: agentBackend ?? '',
+    CODIFF_ATTACH: attach ? '1' : '',
     CODIFF_BRANCH_REF: branchRef ?? '',
     CODIFF_CLAUDE_SESSION_ID: claudeSessionId ?? '',
     CODIFF_COMMIT_REF: commitRef ?? '',

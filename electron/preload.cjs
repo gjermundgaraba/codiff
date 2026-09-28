@@ -147,6 +147,7 @@ const codiff = {
   resetCodeFontSize: () => ipcRenderer.invoke('codiff:resetCodeFontSize'),
   saveMarkdownDocument: (request) => ipcRenderer.invoke('codiff:saveMarkdownDocument', request),
   savePlanReview: (review) => ipcRenderer.invoke('codiff:savePlanReview', review),
+  sendAttachedFeedback: (markdown) => ipcRenderer.invoke('codiff:sendAttachedFeedback', markdown),
   showInFolder: (path) => ipcRenderer.invoke('codiff:showInFolder', path),
   submitPullRequestComment: (request) =>
     ipcRenderer.invoke('codiff:submitPullRequestComment', request),

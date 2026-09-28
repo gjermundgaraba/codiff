@@ -249,6 +249,7 @@ const createCodiffMock = (overrides: Partial<Window['codiff']> = {}): Window['co
     status: 'saved' as const,
   })),
   savePlanReview: vi.fn(async (review) => review),
+  sendAttachedFeedback: vi.fn(async () => {}),
   setDiffStyle: vi.fn(async () => {}),
   setShowOutdated: vi.fn(async () => {}),
   setWordWrap: vi.fn(async () => {}),
@@ -3852,4 +3853,26 @@ test('commit viewed progress synchronizes tree, walkthrough, and uncovered suppo
       'false',
     ]);
   });
+});
+
+test('attached windows offer Send to agent next to copying comments', async () => {
+  window.codiff = createCodiffMock({
+    getLaunchOptions: vi.fn(async () => ({
+      attach: true,
+      repositoryPathProvided: true,
+      walkthrough: false,
+    })),
+  });
+  await using app = await renderReact(<App />);
+
+  await waitFor(() =>
+    expect(
+      app.container.querySelector(
+        '[aria-label="Send review comments to your agent, no comments yet"]',
+      ),
+    ).not.toBeNull(),
+  );
+  expect(
+    app.container.querySelectorAll('.review-top-bar-actions .copy-comments-button'),
+  ).toHaveLength(2);
 });
