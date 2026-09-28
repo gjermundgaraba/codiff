@@ -145,6 +145,8 @@ module.exports = {
       continueOnError: false,
       hardenedRuntime: true,
       identity: process.env.APPLE_SIGNING_IDENTITY,
+      // `APPLE_SIGNING_IDENTITY=-` signs ad hoc, for local builds without a Developer ID.
+      ...(process.env.APPLE_SIGNING_IDENTITY === '-' ? { identityValidation: false } : {}),
       optionsForFile: () => ({
         entitlements: entitlementsPath,
       }),
