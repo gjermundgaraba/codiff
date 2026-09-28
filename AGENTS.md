@@ -1,5 +1,7 @@
 # Agent Instructions
 
+This checkout is a personal fork, not `nkzw-tech/codiff`. Before any work, read @FORK.md and, if present, @FORK.local.md.
+
 - At the end of every code change, run `vpr build` so the built files are refreshed for local testing.
 - Run `vp check --fix` as the validation command after code changes, before `vpr build`.
 - Prefer Phosphor icons over Lucide icons for new UI. Use Lucide only when it is already the established local pattern for that specific control or when a Lucide icon is intentionally better suited, such as existing copy icons.
