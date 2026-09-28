@@ -114,12 +114,15 @@ test('keeps skill instructions identical outside agent integration details', asy
     'opencode/skills/codiff/SKILL.md',
   ];
   const documents = await Promise.all(paths.map((path) => readFile(path, 'utf8')));
+  // Frontmatter differs per agent: the fork makes the Claude, Codex, and Pi skills user-only.
   const normalized = documents.map((document) => {
     expect(document).toContain('   **Agent integration:**');
-    return document.replace(
-      /   \*\*Agent integration:\*\*[\s\S]*?\n\n/,
-      '   **Agent integration:** <agent-specific>\n\n',
-    );
+    return document
+      .replace(/^---\n[\s\S]*?\n---\n/, '')
+      .replace(
+        /   \*\*Agent integration:\*\*[\s\S]*?\n\n/,
+        '   **Agent integration:** <agent-specific>\n\n',
+      );
   });
 
   expect(new Set(normalized).size).toBe(1);

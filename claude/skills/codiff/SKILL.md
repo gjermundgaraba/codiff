@@ -1,6 +1,7 @@
 ---
 name: codiff
-description: Open Codiff for a narrative code walkthrough, a blocking plan handoff, or a shared walkthrough URL. Use when the user writes "$codiff", "/codiff", "$codiff plan", "$codiff share", "show me codiff", "open Codiff", or asks to review a change or edit a plan in Codiff.
+description: Open Codiff for a narrative code walkthrough, a blocking plan handoff, a shared walkthrough URL, or an attached review. Use only when explicitly invoked.
+disable-model-invocation: true
 metadata:
   short-description: Review code or hand off a plan in Codiff
 ---
