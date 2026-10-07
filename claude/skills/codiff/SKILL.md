@@ -26,11 +26,15 @@ change. Codiff owns the format and authoring guidance, so this skill only handle
 - Use **plan mode** for `$codiff plan` or when the user explicitly asks to edit or approve a
   plan in Codiff before execution.
 - Use **desktop mode** for plain `$codiff`, `/codiff`, "open Codiff", or "show me Codiff".
-- In desktop mode, **attach by default** when your tool can run a command in the background and
-  notify you when it exits. Attached, the user can ask you about comments and send you their
-  feedback from Codiff. First read the review guide:
-  `node scripts/open-codiff.mjs --review guide`. Then open with `--attach`. Without that
-  capability, or when the user asks not to attach, open without `--attach`.
+- In desktop mode, **attach by default** only when your execution tool explicitly documents
+  automatic completion notifications that resume the agent. A returned process or session ID
+  only establishes that a command is running; it does not establish notification or resumption.
+  Without that capability, open without `--attach`, unless you will keep the current turn active
+  and collect requests by waiting on or polling the command session. Never end the turn while
+  promising attached responses unless the tool guarantees it will resume you on completion.
+  Attached, the user can ask about comments and send feedback from Codiff. Before opening with
+  `--attach`, read `node scripts/open-codiff.mjs --review guide`. When the user asks not to attach,
+  open without `--attach`.
 - In share mode, only pass `--open` when the user explicitly asks to open the resulting share in
   a browser. Otherwise return the URL without opening it.
 
@@ -138,7 +142,10 @@ approval document.
 
 Emit walkthrough JSON only into the temporary file. In desktop walkthrough mode, do not
 summarize the conversation back to the user. When attached, start
-`node scripts/open-codiff.mjs --review next` in the background right after opening Codiff, and
-handle each request as the review guide describes. In walkthrough share mode, respond with the URL
+`node scripts/open-codiff.mjs --review next` right after opening Codiff. Collect its output through
+the documented completion notification or active waiting/polling, handle the request, then start
+the next wait as the review guide describes. Leaving the command running and sending a final
+response is not an active listener unless completion will resume the agent.
+In walkthrough share mode, respond with the URL
 printed by the command. In plan share mode, respond with the shared plan URL. In plan mode,
 continue from the edited Markdown after the blocking handoff returns.

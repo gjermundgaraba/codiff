@@ -23,10 +23,18 @@ Run from the repository (or pass `--path <repo>`):
 codiff review next
 ```
 
-It waits until the user asks a question or sends feedback, prints it as JSON, and exits. Waiting
-costs nothing, so run it as a background command when your tool supports that, and you are notified
-when it exits. Pass `--wait <seconds>` to return `{"kind": "idle"}` after that long instead, and
-`--kind question|feedback` to only receive one kind.
+It waits until the user asks a question or sends feedback, prints it as JSON, and exits. The
+command does not itself notify or resume the agent; that depends on the agent's execution tool.
+A returned process or session ID is not evidence of automatic completion notifications.
+
+Run it in the background only when the tool explicitly documents that completion will resume
+you. Otherwise, keep the current turn active and collect the output by waiting on or polling the
+existing command session. Do not end the turn while promising attached responses without that
+resumption guarantee. If you cannot maintain the wait, open Codiff without `--attach`.
+
+For bounded waits, pass `--wait 30` to return `{"kind": "idle"}` after 30 seconds and wait again
+after an idle result. An idle result does not end the review. Pass `--kind question|feedback` to
+only receive one kind. Keep one pending wait per review; collect it before starting another.
 
 Handle each request, then run `codiff review next` again. Stop when the user says the review is
 over.
