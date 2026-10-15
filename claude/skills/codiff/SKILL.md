@@ -101,6 +101,7 @@ approval document.
 
 3. **Author the JSON** per the guide and write it to a unique temporary file outside the
    repository, such as `$TMPDIR/codiff-walkthrough-<id>.json`.
+   Write hunk ids in full, never through shell variables (see the guide's hunkId format).
 
 4. **Complete the selected handoff.**
 

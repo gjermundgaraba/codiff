@@ -49,6 +49,12 @@ fork.
     `electron/main/command-line.cjs`, one launch option in `core/types.ts`, the
     preload bridge, the button in `core/App.tsx`, and an "attached mode" line
     plus a `--review` passthrough in each agent skill (`*/skills/codiff/`).
+- **Hunk id diagnostics**: when no walkthrough stop resolves, the error names
+  an authored hunk id next to a real one from the diff, and flags ids that zsh
+  rewrote (`$VAR:h1` becomes `.1`). The logic is in
+  `electron/walkthrough-hunk-hint.cjs`, hooked into the error in
+  `electron/narrative-walkthrough.cjs`. The walkthrough guide and each skill
+  tell agents to write hunk ids in full, never through shell variables.
 - **User-only agent skills**: the Claude and Pi skills set
   `disable-model-invocation: true`, and the Codex skill has
   `agents/openai.yaml` with `allow_implicit_invocation: false`, so agents only

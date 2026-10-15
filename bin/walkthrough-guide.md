@@ -90,6 +90,10 @@ The `<scope>` segment depends on which diff you anchored against:
     **`HEAD`** SHA, _not_ `<branch>`.
   - ref range (`codiff base..head` or `base...head`): the resolved SHA of `head`.
 
+Write every hunk id out in full. Create the file with a file-writing tool or a quoted heredoc
+(`<<'EOF'`), and never build ids from shell variables: zsh reads `$SCOPE:h1` as the `:h`
+modifier, so `path:$SCOPE:h1` becomes `path:.1` and no stop resolves.
+
 ## Schema
 
 The document must conform to the following JSON schema:

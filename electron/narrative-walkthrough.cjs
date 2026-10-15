@@ -30,6 +30,7 @@ const {
   isSyntheticWalkthroughHunk,
   sumHunkLineCounts,
 } = require('../core/lib/narrative-walkthrough-diff.cjs');
+const { describeUnresolvedHunkIds } = require('./walkthrough-hunk-hint.cjs');
 
 /**
  * @typedef {import('../core/types.ts').ChangedFile} ChangedFile
@@ -452,7 +453,9 @@ const normalizeNarrativeWalkthrough = (input, files, facts = {}, hunkIdByAlias =
   const coveredHunkIds = new Set();
   const { chapters, itemIds, stopCount } = normalizeChapters(input, index, coveredHunkIds);
   if (chapters.length === 0 || stopCount === 0) {
-    throw new Error('Narrative walkthrough has no chapters with resolvable stops.');
+    throw new Error(
+      `Narrative walkthrough has no chapters with resolvable stops.${describeUnresolvedHunkIds(input, index.hunkById)}`,
+    );
   }
 
   const support = normalizeAuthoredSupport(input, index, coveredHunkIds, itemIds);
