@@ -33,6 +33,10 @@ fork.
   - Inbox: `electron/attached-review.cjs`, one folder of JSON files per
     repository under `~/.codiff/attached/`. No server; each file has one
     writer.
+  - Each attached window owns a session in `session.json`. When the window
+    closes, Codiff quits, or a newer attached review replaces it,
+    `codiff review next` returns `"kind": "closed"` so the agent stops
+    listening on its own.
   - CLI: `bin/review-cli.js`. Agent guide: `bin/attached-review-guide.md`,
     printed by `codiff review guide`.
   - UI: `core/app/components/SendToAgentButton.tsx`.

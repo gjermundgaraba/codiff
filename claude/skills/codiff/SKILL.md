@@ -145,7 +145,8 @@ summarize the conversation back to the user. When attached, start
 `node scripts/open-codiff.mjs --review next` right after opening Codiff. Collect its output through
 the documented completion notification or active waiting/polling, handle the request, then start
 the next wait as the review guide describes. Leaving the command running and sending a final
-response is not an active listener unless completion will resume the agent.
+response is not an active listener unless completion will resume the agent. When `next` returns
+`"kind": "closed"`, the user closed Codiff: stop listening and do not start another wait.
 In walkthrough share mode, respond with the URL
 printed by the command. In plan share mode, respond with the shared plan URL. In plan mode,
 continue from the edited Markdown after the blocking handoff returns.

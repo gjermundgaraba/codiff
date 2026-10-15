@@ -119,9 +119,10 @@ const {
 const { getPlanReviewPath, readPlanReview, writePlanReview } = require('./plan-review.cjs');
 const {
   askAttachedAgent,
+  closeAttachedReview,
   getAttachedReviewDir,
-  resetAttachedReview,
   sendAttachedFeedback,
+  startAttachedReview,
 } = require('./attached-review.cjs');
 const { createSharedPlanSnapshot } = require('./shared-plan.cjs');
 const { createWalkthroughProgressReporter } = require('./walkthrough-progress.cjs');
@@ -259,11 +260,27 @@ const getWindowAttachedReviewDir = (webContentsId) =>
     ? getAttachedReviewDir(getWindowRepositoryRoot(webContentsId))
     : null;
 
+/** @type {Map<number, { dir: string, session: string }>} */
+const windowAttachedReviews = new Map();
+
+/** Tells the attached agent the review is over. @param {number} webContentsId */
+const endWindowAttachedReview = (webContentsId) => {
+  const review = windowAttachedReviews.get(webContentsId);
+  windowAttachedReviews.delete(webContentsId);
+  if (review) {
+    closeAttachedReview(review.dir, review.session);
+  }
+};
+
 /** Opening an attached window starts a fresh inbox. @param {number} webContentsId */
 const startWindowAttachedReview = (webContentsId) => {
+  endWindowAttachedReview(webContentsId);
   const attachedReviewDir = getWindowAttachedReviewDir(webContentsId);
   if (attachedReviewDir) {
-    resetAttachedReview(attachedReviewDir);
+    windowAttachedReviews.set(webContentsId, {
+      dir: attachedReviewDir,
+      session: startAttachedReview(attachedReviewDir),
+    });
   }
 };
 
@@ -1125,6 +1142,7 @@ const createWindow = (
     });
   });
   window.on('closed', () => {
+    endWindowAttachedReview(webContentsId);
     openWindows.delete(window);
     definitionSearchCoordinator.cancel(webContentsId);
     repositoryWatcherCoordinator.detach(webContentsId);

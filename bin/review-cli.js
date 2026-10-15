@@ -8,9 +8,14 @@ import { parseArgs } from 'node:util';
 const require = createRequire(import.meta.url);
 const {
   getAttachedReviewDir,
+  isAttachedSessionOpen,
+  readAttachedSession,
   replyToRequest,
   takeNextRequest,
 } = require('../electron/attached-review.cjs');
+
+// How long `next` waits for Codiff to open a review before it gives up.
+const STARTUP_TIMEOUT_MS = 60 * 1000;
 
 const guidePath = resolve(dirname(fileURLToPath(import.meta.url)), 'attached-review-guide.md');
 
@@ -38,13 +43,16 @@ const parseWaitMs = (value) => {
 
 /**
  * `codiff review <guide|next|reply>`: the agent side of an attached review. `next` checks the
- * inbox on disk instead of holding a connection, so it costs nothing while it waits and works
- * whether or not Codiff is running.
+ * inbox on disk instead of holding a connection, so it costs nothing while it waits. It follows one
+ * session, named by `--session` or the first open one it sees, and reports `closed` once that
+ * session's window closes, Codiff exits, or a newer attached review replaces it.
  *
  * @param {ReadonlyArray<string>} args Arguments after `codiff review`.
  * @param {{
  *   cwd?: string,
+ *   isProcessRunning?: (pid: number) => boolean,
  *   pollIntervalMs?: number,
+ *   startupTimeoutMs?: number,
  *   stderr?: { write: (text: string) => unknown },
  *   stdin?: AsyncIterable<string | Uint8Array>,
  *   stdout?: { write: (text: string) => unknown },
@@ -54,7 +62,9 @@ export const runReviewCommand = async (
   args,
   {
     cwd = process.cwd(),
+    isProcessRunning,
     pollIntervalMs = 500,
+    startupTimeoutMs = STARTUP_TIMEOUT_MS,
     stderr = process.stderr,
     stdin = process.stdin,
     stdout = process.stdout,
@@ -76,6 +86,7 @@ export const runReviewCommand = async (
         file: { type: 'string' },
         kind: { type: 'string' },
         path: { type: 'string' },
+        session: { type: 'string' },
         wait: { type: 'string' },
       },
     });
@@ -85,11 +96,33 @@ export const runReviewCommand = async (
       if (values.kind != null && values.kind !== 'question' && values.kind !== 'feedback') {
         throw new Error('--kind must be question or feedback.');
       }
-      const deadline = Date.now() + parseWaitMs(values.wait);
+      const startedAt = Date.now();
+      const deadline = startedAt + parseWaitMs(values.wait);
+      let sessionId = values.session;
       while (true) {
-        const request = takeNextRequest(dir, values.kind);
-        if (request || Date.now() >= deadline) {
-          stdout.write(`${JSON.stringify(request ?? { kind: 'idle' }, null, 2)}\n`);
+        const session = readAttachedSession(dir);
+        // Without --session, follow the open session. A session that closed before this wait began
+        // belongs to an earlier review, so keep waiting for the window that is about to open.
+        if (
+          !sessionId &&
+          session &&
+          (isAttachedSessionOpen(session, isProcessRunning) || (session.closedAt ?? 0) >= startedAt)
+        ) {
+          sessionId = session.id;
+        }
+        // A different session means a newer attached review replaced the one being followed.
+        const replaced = sessionId != null && session?.id !== sessionId;
+        // Pending requests come first, including feedback sent just before the window closed.
+        const request = replaced ? null : takeNextRequest(dir, values.kind);
+        const now = Date.now();
+        const closed = sessionId
+          ? replaced || !session || !isAttachedSessionOpen(session, isProcessRunning)
+          : now - startedAt >= startupTimeoutMs;
+        const result =
+          request ?? (closed ? { kind: 'closed' } : now >= deadline ? { kind: 'idle' } : null);
+        if (result) {
+          const output = sessionId ? { ...result, session: sessionId } : result;
+          stdout.write(`${JSON.stringify(output, null, 2)}\n`);
           return 0;
         }
         await new Promise((resolveWait) => setTimeout(resolveWait, pollIntervalMs));

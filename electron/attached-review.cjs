@@ -19,6 +19,7 @@ const { basename, dirname, join, resolve } = require('node:path');
  * Attached reviews connect a Codiff window to the agent that opened it through a folder inbox per
  * repository. Codiff writes requests, the agent picks them up with `codiff review next`:
  *
+ *   session.json         the window that owns the inbox, and when it closed
  *   requests/<id>.json   a question (from Ask) or feedback (from Send to agent)
  *   replies/<id>.json    the agent's answer to a question
  *   delivered/<id>.json  feedback the agent has picked up
@@ -29,6 +30,7 @@ const { basename, dirname, join, resolve } = require('node:path');
  * @typedef {import('../core/types.ts').ReviewAssistantRequest} ReviewAssistantRequest
  * @typedef {import('../core/types.ts').ReviewAssistantResult} ReviewAssistantResult
  * @typedef {(ReviewAssistantRequest & { kind: 'question' }) | { kind: 'feedback', markdown: string }} AttachedRequest
+ * @typedef {{ closedAt?: number, id: string, pid: number, startedAt: number }} AttachedSession
  */
 
 const POLL_INTERVAL_MS = 500;
@@ -104,10 +106,55 @@ const getRequestPath = (dir, id) => {
   return join(dir, 'requests', `${id}.json`);
 };
 
-/** Drops whatever an earlier attached window left behind. @param {string} dir */
-const resetAttachedReview = (dir) => {
+/** @param {string} dir @returns {AttachedSession | null} */
+const readAttachedSession = (dir) => readJson(join(dir, 'session.json'));
+
+/**
+ * Starts a fresh inbox owned by a new session. Dropping whatever an earlier attached window left
+ * behind also ends that review.
+ *
+ * @param {string} dir
+ * @returns {string} The session id.
+ */
+const startAttachedReview = (dir) => {
   rmSync(dir, { force: true, recursive: true });
+  /** @type {AttachedSession} */
+  const session = { id: randomUUID(), pid: process.pid, startedAt: Date.now() };
+  writeJson(join(dir, 'session.json'), session);
+  return session.id;
 };
+
+/**
+ * Marks the session closed, unless a newer session has already replaced it.
+ *
+ * @param {string} dir
+ * @param {string} id
+ */
+const closeAttachedReview = (dir, id) => {
+  const session = readAttachedSession(dir);
+  if (session?.id === id && session.closedAt == null) {
+    writeJson(join(dir, 'session.json'), { ...session, closedAt: Date.now() });
+  }
+};
+
+/** @param {number} pid */
+const isProcessRunning = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return /** @type {NodeJS.ErrnoException} */ (error).code === 'EPERM';
+  }
+};
+
+/**
+ * A session is open until its window closes or Codiff exits without closing it.
+ *
+ * @param {AttachedSession} session
+ * @param {(pid: number) => boolean} [isRunning]
+ */
+const isAttachedSessionOpen = (session, isRunning = isProcessRunning) =>
+  session.closedAt == null && isRunning(session.pid);
 
 /** @param {string} dir @param {AttachedRequest} request */
 const addRequest = (dir, request) => {
@@ -225,9 +272,12 @@ const sendAttachedFeedback = (dir, markdown) => {
 
 module.exports = {
   askAttachedAgent,
+  closeAttachedReview,
   getAttachedReviewDir,
+  isAttachedSessionOpen,
+  readAttachedSession,
   replyToRequest,
-  resetAttachedReview,
   sendAttachedFeedback,
+  startAttachedReview,
   takeNextRequest,
 };

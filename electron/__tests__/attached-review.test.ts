@@ -25,10 +25,11 @@ type AttachedRequest = {
 
 const {
   askAttachedAgent,
+  closeAttachedReview,
   getAttachedReviewDir,
   replyToRequest,
-  resetAttachedReview,
   sendAttachedFeedback,
+  startAttachedReview,
   takeNextRequest,
 } = require('../attached-review.cjs') as {
   askAttachedAgent: (
@@ -36,10 +37,11 @@ const {
     request: ReviewAssistantRequest,
     options?: { isCanceled?: () => boolean; pollIntervalMs?: number; timeoutMs?: number },
   ) => Promise<ReviewAssistantResult>;
+  closeAttachedReview: (dir: string, id: string) => void;
   getAttachedReviewDir: (repositoryPath: string, home?: string) => string;
   replyToRequest: (dir: string, id: string, reply: { body: string } | { error: string }) => void;
-  resetAttachedReview: (dir: string) => void;
   sendAttachedFeedback: (dir: string, markdown: unknown) => void;
+  startAttachedReview: (dir: string) => string;
   takeNextRequest: (dir: string, kind?: 'feedback' | 'question') => AttachedRequest | null;
 };
 const { getCommandLineLaunchOptions } = require('../main/command-line.cjs') as {
@@ -61,14 +63,24 @@ const waitForRequest = async (dir: string, kind?: 'feedback' | 'question') => {
   throw new Error('No request arrived.');
 };
 
-const runCli = async (args: ReadonlyArray<string>, options: { cwd: string; stdin?: string }) => {
+const runCli = async (
+  args: ReadonlyArray<string>,
+  options: {
+    cwd: string;
+    isProcessRunning?: (pid: number) => boolean;
+    startupTimeoutMs?: number;
+    stdin?: string;
+  },
+) => {
   let stdout = '';
   let stderr = '';
   const stdin = new PassThrough();
   stdin.end(options.stdin ?? '');
   const code = await runReviewCommand(args, {
     cwd: options.cwd,
+    isProcessRunning: options.isProcessRunning,
     pollIntervalMs: 5,
+    startupTimeoutMs: options.startupTimeoutMs,
     stderr: { write: (text: string) => (stderr += text) },
     stdin,
     stdout: { write: (text: string) => (stdout += text) },
@@ -123,7 +135,7 @@ test('reports agent errors and withdraws questions nobody will see', async () =>
 
   const resetAsk = askAttachedAgent(dir, question, { pollIntervalMs: 5 });
   await waitForRequest(dir);
-  resetAttachedReview(dir);
+  startAttachedReview(dir);
   await expect(resetAsk).resolves.toMatchObject({ status: 'unavailable' });
 });
 
@@ -157,10 +169,11 @@ test('codiff review next and reply talk to the inbox for the working directory',
   });
 
   const dir = getAttachedReviewDir(repository, home);
+  const session = startAttachedReview(dir);
   const answer = askAttachedAgent(dir, question, { pollIntervalMs: 5 });
   const next = await runCli(['next'], { cwd: repository });
   const request = JSON.parse(next.stdout) as AttachedRequest;
-  expect(request).toMatchObject({ comment: question.comment, kind: 'question' });
+  expect(request).toMatchObject({ comment: question.comment, kind: 'question', session });
 
   expect(await runCli(['reply', request.id], { cwd: repository })).toMatchObject({
     code: 1,
@@ -176,6 +189,80 @@ test('codiff review next and reply talk to the inbox for the working directory',
 
   expect((await runCli(['guide'], { cwd: repository })).stdout).toContain('codiff review next');
   expect(await runCli(['nope'], { cwd: repository })).toMatchObject({ code: 1 });
+});
+
+test('codiff review next reports closed once the window closes, after pending feedback', async () => {
+  await using directory = await createTemporaryDirectory('codiff-attached-closed-');
+  const home = join(directory.path, 'home');
+  const repository = join(directory.path, 'repo');
+  await mkdir(repository);
+  using _environment = createTemporaryEnvironment({ CODIFF_HOME: home });
+  const dir = getAttachedReviewDir(repository, home);
+
+  const session = startAttachedReview(dir);
+  const waiting = runCli(['next'], { cwd: repository });
+  await new Promise((resolveWait) => setTimeout(resolveWait, 20));
+  sendAttachedFeedback(dir, 'Rename this.');
+  closeAttachedReview(dir, session);
+
+  expect(JSON.parse((await waiting).stdout)).toMatchObject({
+    kind: 'feedback',
+    markdown: 'Rename this.',
+    session,
+  });
+  expect(
+    JSON.parse((await runCli(['next', '--session', session], { cwd: repository })).stdout),
+  ).toEqual({ kind: 'closed', session });
+  // Without --session, a review that closed before the wait began is a leftover.
+  expect(
+    JSON.parse((await runCli(['next'], { cwd: repository, startupTimeoutMs: 20 })).stdout),
+  ).toEqual({ kind: 'closed' });
+});
+
+test('codiff review next reports closed when Codiff exits or a newer review replaces it', async () => {
+  await using directory = await createTemporaryDirectory('codiff-attached-replaced-');
+  const home = join(directory.path, 'home');
+  const repository = join(directory.path, 'repo');
+  await mkdir(repository);
+  using _environment = createTemporaryEnvironment({ CODIFF_HOME: home });
+  const dir = getAttachedReviewDir(repository, home);
+
+  const first = startAttachedReview(dir);
+  expect(
+    JSON.parse(
+      (
+        await runCli(['next', '--session', first], {
+          cwd: repository,
+          isProcessRunning: () => false,
+        })
+      ).stdout,
+    ),
+  ).toEqual({ kind: 'closed', session: first });
+
+  const following = runCli(['next', '--session', first], { cwd: repository });
+  const second = startAttachedReview(dir);
+  sendAttachedFeedback(dir, 'For the new agent.');
+  expect(JSON.parse((await following).stdout)).toEqual({ kind: 'closed', session: first });
+  expect(JSON.parse((await runCli(['next'], { cwd: repository })).stdout)).toMatchObject({
+    kind: 'feedback',
+    session: second,
+  });
+});
+
+test('codiff review next waits for the window being opened instead of an earlier closed one', async () => {
+  await using directory = await createTemporaryDirectory('codiff-attached-startup-');
+  const home = join(directory.path, 'home');
+  const repository = join(directory.path, 'repo');
+  await mkdir(repository);
+  using _environment = createTemporaryEnvironment({ CODIFF_HOME: home });
+  const dir = getAttachedReviewDir(repository, home);
+
+  closeAttachedReview(dir, startAttachedReview(dir));
+  const waiting = runCli(['next'], { cwd: repository });
+  await new Promise((resolveWait) => setTimeout(resolveWait, 20));
+  const session = startAttachedReview(dir);
+  sendAttachedFeedback(dir, 'Looks good.');
+  expect(JSON.parse((await waiting).stdout)).toMatchObject({ kind: 'feedback', session });
 });
 
 test('parses the attach launch flag', () => {

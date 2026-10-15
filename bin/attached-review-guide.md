@@ -36,8 +36,12 @@ For bounded waits, pass `--wait 30` to return `{"kind": "idle"}` after 30 second
 after an idle result. An idle result does not end the review. Pass `--kind question|feedback` to
 only receive one kind. Keep one pending wait per review; collect it before starting another.
 
+Once the review is open, every result names it in `session`. Pass that back on later waits as
+`codiff review next --session <session>`, so you keep following your own review even if another
+agent opens one for the same repository.
+
 Handle each request, then run `codiff review next` again. Stop when the user says the review is
-over.
+over, or when `next` returns `"kind": "closed"`.
 
 - `"kind": "question"`: `comment` holds the question and the file and lines it is about. Answer
   with `codiff review reply <id> --body "<answer>"` (or `--file <path>`, `-` for stdin). If you
@@ -45,6 +49,10 @@ over.
   you reply, so `next` returns it again after a restart.
 - `"kind": "feedback"`: `markdown` holds the user's review comments. Picking it up is enough; act
   on it like any other user request. Re-check each comment against the current code.
+- `"kind": "closed"`: the user closed the Codiff window, Codiff quit, or a newer attached review
+  replaced this one. The review is over: do not run `next` again, and briefly tell the user you
+  stopped listening. If you opened the newer review yourself, keep following that one instead.
+  `next` also returns `closed` when no review opens within a minute of starting to wait.
 
 Through the Codiff skill launcher, run these as `node scripts/open-codiff.mjs --review next` and
 `node scripts/open-codiff.mjs --review reply <id> ...`.
