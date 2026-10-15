@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { promisify } from 'node:util';
-import { expect, test } from 'vite-plus/test';
+import { expect, test, vi } from 'vite-plus/test';
 import { runReviewCommand } from '../../bin/review-cli.js';
 import { createFakeCommandLogger, createFakeOpenLogger } from '../../core/__tests__/helpers/cli.ts';
 import { getGitTestEnvironment } from '../../core/__tests__/helpers/git.ts';
@@ -155,6 +155,25 @@ test('hands out feedback once and in order, and filters by kind', async () => {
   expect(await readdir(join(dir, 'delivered'))).toHaveLength(2);
   expect(takeNextRequest(dir)?.kind).toBe('question');
   expect(() => replyToRequest(dir, '../escape', { body: 'x' })).toThrow('Invalid request id');
+});
+
+test('keeps requests sent within the same millisecond in order', async () => {
+  await using directory = await createTemporaryDirectory('codiff-attached-order-');
+  const dir = join(directory.path, 'inbox');
+  vi.useFakeTimers({ now: new Date('2026-01-01T00:00:00.000Z'), toFake: ['Date'] });
+  try {
+    for (const batch of ['1', '2', '3', '4', '5', '6', '7', '8']) {
+      sendAttachedFeedback(dir, batch);
+    }
+  } finally {
+    vi.useRealTimers();
+  }
+
+  const received = [];
+  for (let request = takeNextRequest(dir); request; request = takeNextRequest(dir)) {
+    received.push(request.markdown);
+  }
+  expect(received).toEqual(['1', '2', '3', '4', '5', '6', '7', '8']);
 });
 
 test('codiff review next and reply talk to the inbox for the working directory', async () => {

@@ -156,10 +156,14 @@ const isProcessRunning = (pid) => {
 const isAttachedSessionOpen = (session, isRunning = isProcessRunning) =>
   session.closedAt == null && isRunning(session.pid);
 
+let requestSequence = 0;
+
 /** @param {string} dir @param {AttachedRequest} request */
 const addRequest = (dir, request) => {
-  // Timestamped ids keep the inbox in the order requests were sent.
-  const id = `${new Date().toISOString().replaceAll(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`;
+  // Timestamped ids keep the inbox in the order requests were sent. The sequence orders requests
+  // sent within the same millisecond.
+  requestSequence = (requestSequence + 1) % 1_000_000;
+  const id = `${new Date().toISOString().replaceAll(/[:.]/g, '-')}-${String(requestSequence).padStart(6, '0')}-${randomUUID().slice(0, 8)}`;
   writeJson(getRequestPath(dir, id), { id, ...request });
   return id;
 };
